@@ -1,62 +1,52 @@
 package com.exchange.server;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.*;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.util.CharsetUtil;
 
 public class ExchangeServer {
 
-    public static void main(String[] args) throws InterruptedException {
-        NioEventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        NioEventLoopGroup workerGroup = new NioEventLoopGroup(1);
+    private final int port;
+
+    public ExchangeServer(int port) {
+        this.port = port;
+    }
+
+    public void start() throws InterruptedException {
+        // Configure the server.
+        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
+        EventLoopGroup workerGroup = new NioEventLoopGroup(1); // single-threaded worker
 
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
+//                    .handler(new LoggingHandler(LogLevel.INFO))
+                    .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel ch) {
-                            ChannelPipeline pipeline = ch.pipeline();
-//                            pipeline.addLast(new LengthFieldBasedFrameDecoder(1024, 0, 4, 0, 4));
-//                            pipeline.addLast(new ClientHandler());
-                            pipeline.addLast(new ServerHandler());
+                            ch.pipeline().addLast(new ServerHandler());
                         }
                     });
-            // Start the server
-//            bootstrap.bind(8080).sync().channel().closeFuture().sync();
-            ChannelFuture future = bootstrap.bind(8080).sync();
+            // Start the server.
+            ChannelFuture future = bootstrap.bind(port).sync();
+            // Wait until the server socket is closed.
             future.channel().closeFuture().sync();
-            System.out.println("Server started at port: 8080");
         } finally {
+            // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
         }
     }
 
-//    static class ServerHandler extends ChannelInboundHandlerAdapter {
-//        @Override
-//        public void channelRead(ChannelHandlerContext ctx, Object msg) {
-//            ByteBuf byteBuf = (ByteBuf) msg;
-//            String received = byteBuf.toString(CharsetUtil.UTF_8);
-//            System.out.println("Server received: " + received);
-//            ctx.write(msg);
-//        }
-//
-//        @Override
-//        public void channelReadComplete(ChannelHandlerContext ctx) {
-//            ctx.flush();
-//        }
-//
-//        @Override
-//        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-//            cause.printStackTrace();
-//            ctx.close();
-//        }
-//    }
+    public static void main(String[] args) throws InterruptedException {
+        new ExchangeServer(8080).start();
+    }
 }
