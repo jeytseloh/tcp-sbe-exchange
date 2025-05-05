@@ -7,33 +7,106 @@
                     description="Schema representing a message">
 
     <types>
-        <composite name="messageHeader" description="Message identifiers and length of message root">
+        <type name="enumEncoding" primitiveType="uint8"/>
+        <type name="date" primitiveType="uint16"/>
+        <composite name="messageHeader">
             <type name="blockLength" primitiveType="uint16"/>
             <type name="templateId" primitiveType="uint16"/>
             <type name="schemaId" primitiveType="uint16"/>
             <type name="version" primitiveType="uint16"/>
+            <type name="numGroups" primitiveType="uint16"/>
+            <type name="numVarDataFields" primitiveType="uint16"/>
+        </composite>
+        <composite name="groupSizeEncoding">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="numInGroup" primitiveType="uint16"/>
+            <type name="numGroups" primitiveType="uint16"/>
+            <type name="numVarDataFields" primitiveType="uint16"/>
+        </composite>
+        <composite name="timestampEncoding" description="UTC timestamp with nanosecond precision">
+            <type name="time" primitiveType="uint64"/>
+            <type name="unit" primitiveType="uint8" presence="constant" valueRef="TimeUnit.nanosecond"/>
         </composite>
 
-        <type name="Symbol" primitiveType="char" length="4" characterEncoding="ASCII" description="Stock symbol"/>
+        <composite name="varStringEncoding" description="Variable-length string">
+            <type name="length" primitiveType="uint16"/>
+            <type name="varData" length="0" primitiveType="uint8"
+                  characterEncoding="UTF-16"/>
+        </composite>
+        <enum name="TimeUnit" encodingType="uint8">
+            <validValue name="second">0</validValue>
+            <validValue name="millisecond">3</validValue>
+            <validValue name="microsecond">6</validValue>
+            <validValue name="nanosecond">9</validValue>
+        </enum>
+        <enum name="SideEnum" encodingType="enumEncoding">
+            <validValue name="BUY">1</validValue>
+            <validValue name="SELL">2</validValue>
+        </enum>
+        <enum name="OrderTypeEnum" encodingType="enumEncoding">
+            <validValue name="LIMIT">1</validValue>
+            <validValue name="MARKET">2</validValue>
+            <validValue name="STOP">3</validValue>
+            <validValue name="STOPLIMIT">4</validValue>
+        </enum>
+        <enum name="OrderStatusEnum" encodingType="enumEncoding">
+            <validValue name="New">0</validValue>
+            <validValue name="Filled">1</validValue>
+            <validValue name="PendingFill">2</validValue>
+            <validValue name="Cancelled">3</validValue>
+            <validValue name="PendingCancel">4</validValue>
+            <validValue name="Rejected">5</validValue>
+        </enum>
+        <enum name="OrderRejectEnum" encodingType="enumEncoding">
+            <validValue name="InvalidOrder">0</validValue>
+            <validValue name="UnknownOrderID">1</validValue>
+            <validValue name="Other">2</validValue>
+        </enum>
+        <enum name="MessageTypeEnum" encodingType="enumEncoding">
+            <validValue name="NewOrder">0</validValue>
+            <validValue name="CancelOrder">1</validValue>
+            <validValue name="BulkCancel">2</validValue>
+        </enum>
     </types>
 
     <sbe:message name="NewOrder" id="1" description="New order from client">
-        <field name="orderId" id="1" type="uint64" description="Unique order ID"/>
-        <field name="symbol" id="2" type="Symbol" description="Stock symbol"/>
-        <field name="side" id="3" type="uint8" description="Order side (buy = 0, sell = 1)"/>
-        <field name="quantity" id="4" type="uint32" description="Order quantity"/>
-        <field name="price" id="5" type="uint64" description="Order price"/>
+<!--        <field name="orderId" id="1" type="uint64" description="Unique order ID"/>-->
+        <field name="side" id="1" type="SideEnum" description="Order side (buy = 0, sell = 1)"/>
+        <field name="quantity" id="2" type="uint32" description="Order quantity"/>
+        <field name="price" id="3" type="double" description="Order price"/>
+        <field name="orderType" id="4" type="OrderTypeEnum" description="Order type (limit = 1, market = 2)"/>
+<!--        <field name="timestamp" id="6" type="timestampEncoding" description="Timestamp created"/>-->
+    </sbe:message>
+
+    <sbe:message name="CancelOrder" id="4">
+        <field name="orderId" id="1" type="uint64"/>
+<!--        <field name="timestamp" id="2" type="timeStampEncoding"/>-->
+    </sbe:message>
+
+    <sbe:message name="BulkCancelOrders" id="5">
+        <group name="Orders" id="1" dimensionType="groupSizeEncoding">
+            <field name="orderId" id="2" type="uint64"/>
+        </group>
     </sbe:message>
 
     <sbe:message name="OrderAcknowledged" id="2" description="Order acknowledged by exchange">
         <field name="orderId" id="1" type="uint64" description="Unique order ID"/>
-        <field name="status" id="2" type="uint8" description="Order status (0 = Rejected, 1 = Accepted)"/>
+        <field name="messageType" id="2" type="MessageTypeEnum" description="Type of message acknowledged by server"/>
+<!--        <field name="timestamp" id="2" type="timeStampEncoding"/>-->
+    </sbe:message>
+
+    <sbe:message name="OrderRejected" id="6" description="Order rejected with reason">
+<!--        <field name="orderId" id="1" type="uint64"/>-->
+<!--        <field name="timestamp" id="3" type="timeStampEncoding"/>-->
+        <field name="messageType" id="1" type="MessageTypeEnum" description="Type of message being rejected by server"/>
+        <field name="reason" id="2" type="OrderRejectEnum" description="Reason for order rejection by server"/>
     </sbe:message>
 
     <sbe:message name="OrderFilled" id="3" description="Order filled by exchange">
         <field name="orderId" id="1" type="uint64" description="Unique order ID"/>
-        <field name="filledQuantity" id="2" type="uint32" description="Filled quantity"/>
-        <field name="filledPrice" id="3" type="uint64" description="Filled price"/>
+        <field name="filledQuantity" id="2" type="uint64" description="Filled quantity"/>
+        <field name="filledPrice" id="3" type="double" description="Filled price"/>
+<!--        <field name="timestamp" id="4" type="timeStampEncoding"/>-->
     </sbe:message>
 
 </sbe:messageSchema>
